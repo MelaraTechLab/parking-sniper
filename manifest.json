@@ -1,0 +1,31 @@
+{
+    "manifest_version": 3,
+    "name": "Parking Sniper",
+    "version": "1.0.0",
+    "description": "Automatiza la búsqueda y notificación de parqueos disponibles",
+    "permissions": ["storage", "activeTab", "notifications"],
+    "host_permissions": ["https://*.uvg.edu.gt/*"],
+    "action": {
+        "default_popup": "popup/popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://*.uvg.edu.gt/*"],
+            "js": ["content/content.js"],
+            "run_at": "document_end"
+        }
+    ],
+    "background": {
+        "service_worker": "background/background.js"
+    },
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    }
+}
