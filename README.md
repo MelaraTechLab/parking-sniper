@@ -65,11 +65,21 @@ El bot navega por las 3 pantallas:
 
 ## Logs de actividad
 
-En el panel de control puedes ver:
+**En el panel de control de la extensión (popup):**
 - Cuándo iniciaste/detuviste el bot
 - Qué parqueos agregaste/eliminaste
-- Cuántos espacios disponibles encontró en cada parqueo
+- Acciones del bot (navegación, selección, etc.)
 - Cualquier error que ocurra
+
+**En la consola del navegador (F12):**
+- Solo información relevante: lista de parqueos y espacios disponibles
+- Ejemplo:
+  ```
+  [Parking Sniper] Parqueos monitoreados:
+    - PARQUEO CIT - T: 0 disponibles
+    - PARQUEO 7B - T: 0 disponibles
+    - PARQUEO 7A - T: 0 disponibles
+  ```
 
 ## Limitaciones actuales
 
