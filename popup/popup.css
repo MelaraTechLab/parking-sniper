@@ -443,6 +443,26 @@ body {
     flex: 1;
 }
 
+.url-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    font-size: 13px;
+    margin-top: 8px;
+    transition: border-color 0.25s ease;
+}
+
+.url-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.url-input::placeholder {
+    color: var(--muted);
+    opacity: 0.6;
+}
+
 @keyframes fade-in {
     from {
         opacity: 0;

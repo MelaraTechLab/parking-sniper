@@ -3,6 +3,7 @@ let state = {
     vehicleType: "car",
     parkings: [],
     refreshInterval: 10,
+    alertUrl: "",
     logs: [],
 };
 
@@ -26,6 +27,7 @@ const elements = {
     saveParkingBtn: document.getElementById("saveParkingBtn"),
     cancelParkingBtn: document.getElementById("cancelParkingBtn"),
     refreshInterval: document.getElementById("refreshInterval"),
+    alertUrl: document.getElementById("alertUrl"),
     activityLog: document.getElementById("activityLog"),
     vehicleTypes: document.querySelectorAll('input[name="vehicleType"]'),
 };
@@ -37,11 +39,12 @@ async function init() {
 }
 
 async function loadState() {
-    const data = await chrome.storage.local.get(["isActive", "vehicleType", "parkings", "refreshInterval", "logs"]);
+    const data = await chrome.storage.local.get(["isActive", "vehicleType", "parkings", "refreshInterval", "alertUrl", "logs"]);
     state.isActive = data.isActive || false;
     state.vehicleType = data.vehicleType || "car";
     state.parkings = data.parkings || [];
     state.refreshInterval = data.refreshInterval || 10;
+    state.alertUrl = data.alertUrl || "";
     state.logs = data.logs || [];
 }
 
@@ -55,6 +58,7 @@ function setupEventListeners() {
     elements.saveParkingBtn.addEventListener("click", saveParking);
     elements.cancelParkingBtn.addEventListener("click", hideAddParkingModal);
     elements.refreshInterval.addEventListener("change", updateRefreshInterval);
+    elements.alertUrl.addEventListener("change", updateAlertUrl);
 
     elements.vehicleTypes.forEach((radio) => {
         radio.addEventListener("change", updateVehicleType);
@@ -72,6 +76,7 @@ async function toggleBot() {
             vehicleType: state.vehicleType,
             parkings: state.parkings,
             refreshInterval: state.refreshInterval * 1000,
+            alertUrl: state.alertUrl,
         },
     });
 
@@ -92,6 +97,7 @@ function updateUI() {
     elements.toggleBtn.classList.toggle("active", state.isActive);
 
     elements.refreshInterval.value = state.refreshInterval;
+    elements.alertUrl.value = state.alertUrl;
 
     elements.vehicleTypes.forEach((radio) => {
         if (radio.value === state.vehicleType) {
@@ -186,6 +192,16 @@ async function updateRefreshInterval() {
     state.refreshInterval = parseInt(elements.refreshInterval.value);
     await saveState();
     addLog(`Intervalo actualizado: ${state.refreshInterval}s`);
+}
+
+async function updateAlertUrl() {
+    state.alertUrl = elements.alertUrl.value.trim();
+    await saveState();
+    if (state.alertUrl) {
+        addLog(`URL de alerta configurada`);
+    } else {
+        addLog(`URL de alerta eliminada`);
+    }
 }
 
 async function addLog(message) {

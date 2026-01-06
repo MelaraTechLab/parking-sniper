@@ -25,6 +25,11 @@ Haz clic en el ícono de la extensión y configura:
     - ✅ "cit" encuentra "PARQUEO CIT - T" (no importan mayúsculas)
     - ✅ "7A" encuentra "PARQUEO 7A - T"
 - **Intervalo**: Cada cuántos segundos refrescar (5-120 segundos)
+- **URL de alerta** (opcional):
+  - URL que se abrirá automáticamente cuando encuentre un parqueo
+  - Recomendado: Un video de YouTube con autoplay
+  - Ejemplo: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+  - Tip: Habilita autoplay en Chrome para que se reproduzca automáticamente
 
 ### 2. Iniciar el bot
 
@@ -35,15 +40,19 @@ Haz clic en el ícono de la extensión y configura:
 
 ### 3. Cómo te notifica
 
-Cuando encuentra un parqueo disponible, recibes **3 notificaciones simultáneas**:
+Cuando encuentra un parqueo disponible, recibes **4 notificaciones simultáneas**:
 
 1. **🔊 Sonido de alerta**: 3 beeps ascendentes
-2. **🔔 Notificación del navegador**:
+2. **🌐 URL de alerta** (si la configuraste):
+   - Se abre automáticamente en una nueva pestaña
+   - Perfecto para videos de YouTube con autoplay
+   - Te aseguras de escuchar la alerta aunque estés en otra ventana
+3. **🔔 Notificación del navegador**:
    - Aparece en la esquina de tu pantalla
    - Dice "¡PARQUEO DISPONIBLE!"
    - Muestra el nombre del parqueo y cuántos espacios hay
    - Se repite 2 veces (con 3 segundos de diferencia)
-3. **⚠️ Alert en pantalla**:
+4. **⚠️ Alert en pantalla**:
    - Ventana emergente en el navegador
    - Con toda la información del parqueo
    - Dice "¡Apresúrate a reservarlo!"

@@ -3,6 +3,7 @@ const CONFIG = {
     vehicleType: "car",
     parkings: [],
     refreshInterval: 10000,
+    alertUrl: "",
 };
 
 let state = {
@@ -219,6 +220,7 @@ class ParkingMonitor {
 class NotificationManager {
     static show(parkingInfo) {
         this._playSound();
+        this._openAlertUrl();
 
         chrome.runtime.sendMessage({
             action: "notify",
@@ -231,6 +233,17 @@ class NotificationManager {
                 `¡PARQUEO DISPONIBLE!\n\n${parkingInfo.name}\n\n${parkingInfo.available} espacio(s) disponible(s)\n\n¡Apresúrate a reservarlo!`
             );
         }, 100);
+    }
+
+    static _openAlertUrl() {
+        if (CONFIG.alertUrl && CONFIG.alertUrl.trim()) {
+            try {
+                window.open(CONFIG.alertUrl, '_blank');
+                Logger.info("URL de alerta abierta");
+            } catch (error) {
+                Logger.error("No se pudo abrir la URL de alerta");
+            }
+        }
     }
 
     static _playSound() {
@@ -285,6 +298,7 @@ class BotController {
             "vehicleType",
             "parkings",
             "refreshInterval",
+            "alertUrl",
         ]);
 
         if (data.isActive) {
@@ -292,6 +306,7 @@ class BotController {
             CONFIG.vehicleType = data.vehicleType || "car";
             CONFIG.parkings = data.parkings || [];
             CONFIG.refreshInterval = data.refreshInterval * 1000;
+            CONFIG.alertUrl = data.alertUrl || "";
         }
     }
 
@@ -310,6 +325,7 @@ class BotController {
         CONFIG.vehicleType = config.vehicleType;
         CONFIG.parkings = config.parkings;
         CONFIG.refreshInterval = config.refreshInterval;
+        CONFIG.alertUrl = config.alertUrl || "";
 
         state.currentPage = null;
         state.hasProcessedCurrentPage = false;
