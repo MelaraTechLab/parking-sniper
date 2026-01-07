@@ -90,13 +90,27 @@ El bot navega por las 3 pantallas:
     - PARQUEO 7A - T: 0 disponibles
   ```
 
+## Sistema anti-trabado
+
+El bot incluye un **watchdog** que previene que se quede trabado:
+
+- Monitorea cada 15 segundos si está en la misma página
+- Si detecta que está más de 45 segundos en una página (que no sea la de monitoreo):
+  - Te avisa en los logs
+  - Fuerza un reload automático
+  - Continúa el flujo normal
+- Si el clic en calendario falla, reintenta automáticamente
+
+Esto evita perder oportunidades por quedarse trabado en navegación.
+
 ## Limitaciones actuales
 
 - ✅ Monitorea disponibilidad
 - ✅ Te notifica cuando hay espacios
-- ⏸️ NO completa la reserva automáticamente
-  - Cuando te notifica, debes hacer clic manualmente en "Comprar"
-  - Esto es porque aún no tenemos las pantallas con campos de placa/modelo
+- ✅ Sistema anti-trabado con watchdog
+- ⏸️ NO hace clic automático en "Comprar"
+  - Debes hacer clic manualmente cuando te notifique
+  - Los espacios se agotan rápido, estate atento a las notificaciones
 
 ## Tips
 

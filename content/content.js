@@ -11,6 +11,8 @@ let state = {
     isProcessing: false,
     currentPage: null,
     hasProcessedCurrentPage: false,
+    lastPageChange: Date.now(),
+    watchdogTimer: null,
 };
 
 class Logger {
@@ -97,8 +99,17 @@ class NavigationController {
         if (calendarRows.length > 0) {
             Logger.info("Navegando al calendario");
             calendarRows[0].click();
+
+            setTimeout(() => {
+                if (PageDetector.isCalendarPage()) {
+                    Logger.error("Clic en calendario falló, reintentando...");
+                    this.clickCalendar();
+                }
+            }, 3000);
+
             return true;
         }
+        Logger.error("No se encontraron calendarios disponibles");
         return false;
     }
 
@@ -289,6 +300,7 @@ class BotController {
         const currentPage = PageDetector.getCurrentPage();
         if (currentPage && CONFIG.isActive) {
             this._handlePageNavigation(currentPage);
+            this._startWatchdog();
         }
     }
 
@@ -329,8 +341,10 @@ class BotController {
 
         state.currentPage = null;
         state.hasProcessedCurrentPage = false;
+        state.lastPageChange = Date.now();
 
         Logger.info("Bot iniciado");
+        this._startWatchdog();
 
         setTimeout(() => {
             const currentPage = PageDetector.getCurrentPage();
@@ -350,7 +364,40 @@ class BotController {
             clearInterval(state.refreshTimer);
             state.refreshTimer = null;
         }
+        if (state.watchdogTimer) {
+            clearInterval(state.watchdogTimer);
+            state.watchdogTimer = null;
+        }
         CONFIG.isActive = false;
+    }
+
+    static _startWatchdog() {
+        this._stopWatchdog();
+
+        state.watchdogTimer = setInterval(() => {
+            if (!CONFIG.isActive) return;
+
+            const currentPage = PageDetector.getCurrentPage();
+            const timeOnPage = Date.now() - state.lastPageChange;
+            const maxTimeOnPage = 45000;
+
+            if (currentPage === "parking-list") {
+                return;
+            }
+
+            if (timeOnPage > maxTimeOnPage) {
+                Logger.error(`Detectado trabado en página ${currentPage} por ${Math.floor(timeOnPage / 1000)}s`);
+                Logger.info("Forzando recarga de página...");
+                window.location.reload();
+            }
+        }, 15000);
+    }
+
+    static _stopWatchdog() {
+        if (state.watchdogTimer) {
+            clearInterval(state.watchdogTimer);
+            state.watchdogTimer = null;
+        }
     }
 
     static _handlePageNavigation(page) {
@@ -376,8 +423,10 @@ class PageObserver {
             const detectedPage = PageDetector.getCurrentPage();
 
             if (detectedPage && detectedPage !== state.currentPage) {
+                Logger.toConsole(`Cambio de página: ${state.currentPage} → ${detectedPage}`);
                 state.currentPage = detectedPage;
                 state.hasProcessedCurrentPage = false;
+                state.lastPageChange = Date.now();
             }
 
             if (detectedPage && !state.hasProcessedCurrentPage) {
