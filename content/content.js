@@ -322,19 +322,26 @@ class AutoBuyer {
 
     static _downloadPageHTML() {
         try {
+            Logger.info("📥 Iniciando descarga de HTML del formulario...");
             const html = document.documentElement.outerHTML;
+            Logger.info(`📄 HTML capturado: ${html.length} caracteres`);
+
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `parking-FORM-${Date.now()}.html`;
+
+            Logger.info(`💾 Descargando como: ${a.download}`);
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            Logger.info("📥 HTML del formulario descargado");
+
+            Logger.info("✅ HTML del formulario descargado exitosamente");
         } catch (error) {
-            Logger.error(`Error descargando HTML del formulario: ${error.message}`);
+            Logger.error(`❌ Error descargando HTML del formulario: ${error.message}`);
+            Logger.error(`Stack: ${error.stack}`);
         }
     }
 
@@ -376,14 +383,44 @@ class AutoBuyer {
 
         const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input:not([type])');
         const selects = document.querySelectorAll('select');
+        const radios = document.querySelectorAll('input[type="radio"]');
 
-        Logger.info(`📋 Encontrados: ${inputs.length} inputs, ${selects.length} selects`);
+        Logger.info(`📋 Encontrados: ${inputs.length} inputs, ${selects.length} selects, ${radios.length} radios`);
 
-        if (inputs.length === 0 && selects.length === 0) {
+        if (inputs.length === 0 && selects.length === 0 && radios.length === 0) {
             Logger.error("⚠️ NO SE ENCONTRARON CAMPOS EN EL FORMULARIO");
             state.isFillingForm = false;
             return;
         }
+
+        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        Logger.info("🔘 LLENANDO RADIO BUTTONS (opciones múltiples):");
+        const radioGroups = {};
+        radios.forEach((radio) => {
+            const groupName = radio.name;
+            if (!radioGroups[groupName]) {
+                radioGroups[groupName] = [];
+            }
+            radioGroups[groupName].push(radio);
+        });
+
+        Object.keys(radioGroups).forEach((groupName, groupIndex) => {
+            try {
+                const group = radioGroups[groupName];
+                if (group.length > 0) {
+                    const firstRadio = group[0];
+                    firstRadio.checked = true;
+                    const label = firstRadio.nextElementSibling?.textContent?.trim() ||
+                                  firstRadio.parentElement?.textContent?.trim() ||
+                                  firstRadio.value || "(sin label)";
+                    Logger.info(`  ✓ Radio [${groupIndex}] "${groupName}": "${label}" (${group.length} opciones)`);
+                    firstRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                    firstRadio.dispatchEvent(new Event('click', { bubbles: true }));
+                }
+            } catch (error) {
+                Logger.error(`  ✗ Radio group [${groupIndex}] "${groupName}": Error - ${error.message}`);
+            }
+        });
 
         Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         Logger.info("📝 LLENANDO SELECTS (desplegables):");
