@@ -166,6 +166,12 @@ class ParkingMonitor {
                 results.push(parkingInfo);
 
                 if (parkingInfo.available > 0) {
+                    if (state.refreshTimer) {
+                        clearInterval(state.refreshTimer);
+                        state.refreshTimer = null;
+                        Logger.info("Timer de refresco detenido - Espacio encontrado");
+                    }
+
                     this._handleAvailableParking(parkingInfo);
                     return;
                 }
@@ -210,6 +216,13 @@ class ParkingMonitor {
     }
 
     static _handleAvailableParking(parkingInfo) {
+        CONFIG.isActive = false;
+
+        if (state.refreshTimer) {
+            clearInterval(state.refreshTimer);
+            state.refreshTimer = null;
+        }
+
         BotController.stop();
         NotificationManager.show(parkingInfo);
         Logger.availability(parkingInfo.name, parkingInfo.available);
