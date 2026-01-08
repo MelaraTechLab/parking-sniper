@@ -4,6 +4,12 @@ let state = {
     parkings: [],
     refreshInterval: 10,
     alertUrl: "",
+    vehicleData: {
+        plate: "",
+        brand: "",
+        model: "",
+        color: "",
+    },
     logs: [],
 };
 
@@ -28,6 +34,10 @@ const elements = {
     cancelParkingBtn: document.getElementById("cancelParkingBtn"),
     refreshInterval: document.getElementById("refreshInterval"),
     alertUrl: document.getElementById("alertUrl"),
+    vehiclePlate: document.getElementById("vehiclePlate"),
+    vehicleBrand: document.getElementById("vehicleBrand"),
+    vehicleModel: document.getElementById("vehicleModel"),
+    vehicleColor: document.getElementById("vehicleColor"),
     activityLog: document.getElementById("activityLog"),
     vehicleTypes: document.querySelectorAll('input[name="vehicleType"]'),
 };
@@ -39,12 +49,13 @@ async function init() {
 }
 
 async function loadState() {
-    const data = await chrome.storage.local.get(["isActive", "vehicleType", "parkings", "refreshInterval", "alertUrl", "logs"]);
+    const data = await chrome.storage.local.get(["isActive", "vehicleType", "parkings", "refreshInterval", "alertUrl", "vehicleData", "logs"]);
     state.isActive = data.isActive || false;
     state.vehicleType = data.vehicleType || "car";
     state.parkings = data.parkings || [];
     state.refreshInterval = data.refreshInterval || 10;
     state.alertUrl = data.alertUrl || "";
+    state.vehicleData = data.vehicleData || { plate: "", brand: "", model: "", color: "" };
     state.logs = data.logs || [];
 }
 
@@ -59,6 +70,11 @@ function setupEventListeners() {
     elements.cancelParkingBtn.addEventListener("click", hideAddParkingModal);
     elements.refreshInterval.addEventListener("change", updateRefreshInterval);
     elements.alertUrl.addEventListener("change", updateAlertUrl);
+
+    elements.vehiclePlate.addEventListener("change", updateVehicleData);
+    elements.vehicleBrand.addEventListener("change", updateVehicleData);
+    elements.vehicleModel.addEventListener("change", updateVehicleData);
+    elements.vehicleColor.addEventListener("change", updateVehicleData);
 
     elements.vehicleTypes.forEach((radio) => {
         radio.addEventListener("change", updateVehicleType);
@@ -77,6 +93,7 @@ async function toggleBot() {
             parkings: state.parkings,
             refreshInterval: state.refreshInterval * 1000,
             alertUrl: state.alertUrl,
+            vehicleData: state.vehicleData,
         },
     });
 
@@ -98,6 +115,11 @@ function updateUI() {
 
     elements.refreshInterval.value = state.refreshInterval;
     elements.alertUrl.value = state.alertUrl;
+
+    elements.vehiclePlate.value = state.vehicleData.plate;
+    elements.vehicleBrand.value = state.vehicleData.brand;
+    elements.vehicleModel.value = state.vehicleData.model;
+    elements.vehicleColor.value = state.vehicleData.color;
 
     elements.vehicleTypes.forEach((radio) => {
         if (radio.value === state.vehicleType) {
@@ -202,6 +224,15 @@ async function updateAlertUrl() {
     } else {
         addLog(`URL de alerta eliminada`);
     }
+}
+
+async function updateVehicleData() {
+    state.vehicleData.plate = elements.vehiclePlate.value.trim().toUpperCase();
+    state.vehicleData.brand = elements.vehicleBrand.value.trim();
+    state.vehicleData.model = elements.vehicleModel.value.trim();
+    state.vehicleData.color = elements.vehicleColor.value.trim();
+    await saveState();
+    addLog("Datos del vehículo actualizados");
 }
 
 async function addLog(message) {

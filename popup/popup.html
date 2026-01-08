@@ -128,6 +128,30 @@
                 <p class="helper-text">Tip: Usa un video de YouTube con autoplay habilitado para escuchar la alerta.</p>
             </section>
 
+            <section class="card config-section">
+                <div class="section-heading">
+                    <svg viewBox="0 0 24 24" role="presentation">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                    </svg>
+                    <span>Datos del vehículo (auto-llenado)</span>
+                </div>
+                <p class="muted">Datos para llenar automáticamente el formulario de reserva.</p>
+
+                <label for="vehiclePlate" class="form-label">Placa</label>
+                <input type="text" id="vehiclePlate" placeholder="P674FZV" class="form-input" maxlength="7" />
+
+                <label for="vehicleBrand" class="form-label">Marca</label>
+                <input type="text" id="vehicleBrand" placeholder="Toyota Corolla" class="form-input" />
+
+                <label for="vehicleModel" class="form-label">Modelo (año)</label>
+                <input type="text" id="vehicleModel" placeholder="2016" class="form-input" />
+
+                <label for="vehicleColor" class="form-label">Color</label>
+                <input type="text" id="vehicleColor" placeholder="azul gris" class="form-input" />
+
+                <p class="helper-text">Si el bot no puede llenar un campo, seleccionará/escribirá cualquier valor para continuar.</p>
+            </section>
+
             <section class="card log-section">
                 <div class="section-heading">
                     <svg viewBox="0 0 24 24" role="presentation">

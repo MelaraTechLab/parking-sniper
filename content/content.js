@@ -4,6 +4,12 @@ const CONFIG = {
     parkings: [],
     refreshInterval: 10000,
     alertUrl: "",
+    vehicleData: {
+        plate: "",
+        brand: "",
+        model: "",
+        color: "",
+    },
 };
 
 let state = {
@@ -224,6 +230,11 @@ class ParkingMonitor {
         }
 
         BotController.stop();
+
+        setTimeout(() => {
+            AutoBuyer.tryToBuy(parkingInfo.name);
+        }, 100);
+
         NotificationManager.show(parkingInfo);
         Logger.availability(parkingInfo.name, parkingInfo.available);
     }
@@ -233,10 +244,163 @@ class ParkingMonitor {
             this.checkAvailability();
 
             state.refreshTimer = setInterval(() => {
+                if (!CONFIG.isActive) {
+                    clearInterval(state.refreshTimer);
+                    state.refreshTimer = null;
+                    return;
+                }
                 window.location.reload();
             }, CONFIG.refreshInterval);
 
             Logger.info("Monitoreo iniciado");
+        }
+    }
+}
+
+class AutoBuyer {
+    static async tryToBuy(parkingName) {
+        try {
+            Logger.info("Iniciando compra automática");
+
+            const buyButton = this._findBuyButton(parkingName);
+            if (!buyButton) {
+                Logger.error("No se encontró el botón de comprar visible");
+                return;
+            }
+
+            Logger.info("Haciendo clic en Comprar");
+            buyButton.click();
+
+            setTimeout(() => {
+                this._downloadPageHTML();
+                this._fillFormAggressive();
+            }, 2500);
+
+        } catch (error) {
+            Logger.error(`Error en compra automática: ${error.message}`);
+        }
+    }
+
+    static _downloadPageHTML() {
+        try {
+            const html = document.documentElement.outerHTML;
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `parking-form-${Date.now()}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            Logger.info("HTML descargado");
+        } catch (error) {
+            Logger.error(`Error descargando HTML: ${error.message}`);
+        }
+    }
+
+    static _findBuyButton(parkingName) {
+        const tableRows = document.querySelectorAll("table tbody tr");
+
+        for (const row of tableRows) {
+            const nameElement = row.querySelector(".flex-column .text-body h4");
+            if (!nameElement) continue;
+
+            const rowParkingName = nameElement.textContent.trim();
+            if (rowParkingName === parkingName) {
+                const buttons = row.querySelectorAll('button');
+
+                for (const button of buttons) {
+                    const isVisible = !button.classList.contains('d-none') &&
+                        button.offsetParent !== null;
+
+                    const hasGreenStyle = button.classList.contains('btn-success') ||
+                        button.classList.contains('btn-primary') ||
+                        button.textContent.toLowerCase().includes('comprar') ||
+                        button.textContent.toLowerCase().includes('reservar');
+
+                    if (isVisible && hasGreenStyle) {
+                        Logger.info(`Botón encontrado: ${button.textContent.trim()}`);
+                        return button;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    static _fillFormAggressive() {
+        Logger.info("LLENADO AGRESIVO INICIADO");
+
+        const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input:not([type])');
+        const selects = document.querySelectorAll('select');
+
+        Logger.info(`Encontrados ${inputs.length} inputs y ${selects.length} selects`);
+
+        inputs.forEach((input, index) => {
+            const name = (input.name || input.id || input.placeholder || "").toLowerCase();
+
+            if (name.includes('placa') || name.includes('plate')) {
+                const plate = CONFIG.vehicleData.plate || "XXXX";
+                const maxLen = input.maxLength > 0 ? input.maxLength : 7;
+                input.value = plate.substring(0, maxLen);
+                Logger.info(`[${index}] Placa: ${input.value}`);
+            } else if (input.type === 'number' || name.includes('modelo') || name.includes('año')) {
+                input.value = CONFIG.vehicleData.model || "2020";
+                Logger.info(`[${index}] Número: ${input.value}`);
+            } else {
+                input.value = CONFIG.vehicleData.brand || "Toyota";
+                Logger.info(`[${index}] Texto: ${input.value}`);
+            }
+
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event('blur', { bubbles: true }));
+        });
+
+        selects.forEach((select, index) => {
+            if (select.options.length > 1) {
+                select.selectedIndex = 1;
+                Logger.info(`[${index}] Select: ${select.options[1].text}`);
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+
+        setTimeout(() => {
+            this._submitFormAggressive();
+        }, 300);
+    }
+
+    static _submitFormAggressive() {
+        Logger.info("BUSCANDO BOTÓN SUBMIT");
+
+        const allButtons = document.querySelectorAll('button');
+        Logger.info(`Total botones: ${allButtons.length}`);
+
+        const submitButton = document.querySelector('button[type="submit"]') ||
+            document.querySelector('button.btn-success') ||
+            document.querySelector('button.btn-primary') ||
+            Array.from(allButtons).find(btn => {
+                const text = btn.textContent.toLowerCase();
+                return text.includes('reservar') ||
+                    text.includes('confirmar') ||
+                    text.includes('comprar') ||
+                    text.includes('guardar') ||
+                    text.includes('enviar') ||
+                    text.includes('continuar');
+            });
+
+        if (submitButton) {
+            Logger.info(`✅ SUBMIT: ${submitButton.textContent.trim()}`);
+            submitButton.click();
+            Logger.info("🎉 ¡COMPRA COMPLETADA!");
+        } else {
+            Logger.error("❌ NO SE ENCONTRÓ SUBMIT");
+            Logger.info("Botones disponibles:");
+            allButtons.forEach((btn, i) => {
+                Logger.info(`  [${i}] ${btn.textContent.trim()}`);
+            });
         }
     }
 }
@@ -324,6 +488,7 @@ class BotController {
             "parkings",
             "refreshInterval",
             "alertUrl",
+            "vehicleData",
         ]);
 
         if (data.isActive) {
@@ -332,6 +497,7 @@ class BotController {
             CONFIG.parkings = data.parkings || [];
             CONFIG.refreshInterval = data.refreshInterval * 1000;
             CONFIG.alertUrl = data.alertUrl || "";
+            CONFIG.vehicleData = data.vehicleData || { plate: "", brand: "", model: "", color: "" };
         }
     }
 
@@ -351,6 +517,7 @@ class BotController {
         CONFIG.parkings = config.parkings;
         CONFIG.refreshInterval = config.refreshInterval;
         CONFIG.alertUrl = config.alertUrl || "";
+        CONFIG.vehicleData = config.vehicleData || { plate: "", brand: "", model: "", color: "" };
 
         state.currentPage = null;
         state.hasProcessedCurrentPage = false;
