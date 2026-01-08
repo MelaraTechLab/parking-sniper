@@ -229,12 +229,32 @@ class ParkingMonitor {
         const priorityLabel = parkingInfo.isPriority ? " [PRIORITARIO]" : " [REVISAR MANUALMENTE]";
         Logger.info(`Espacio encontrado: ${parkingInfo.name}${priorityLabel}`);
 
+        this._downloadParkingListHTML();
+
         setTimeout(() => {
             AutoBuyer.tryToBuy(parkingInfo.name, parkingInfo.isPriority);
         }, 100);
 
         NotificationManager.show(parkingInfo);
         Logger.availability(parkingInfo.name, parkingInfo.available);
+    }
+
+    static _downloadParkingListHTML() {
+        try {
+            const html = document.documentElement.outerHTML;
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `parking-list-AVAILABLE-${Date.now()}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            Logger.info("📥 HTML de lista de parqueos descargado");
+        } catch (error) {
+            Logger.error(`Error descargando HTML de lista: ${error.message}`);
+        }
     }
 
     static start() {
@@ -307,14 +327,14 @@ class AutoBuyer {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `parking-form-${Date.now()}.html`;
+            a.download = `parking-FORM-${Date.now()}.html`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            Logger.info("HTML descargado");
+            Logger.info("📥 HTML del formulario descargado");
         } catch (error) {
-            Logger.error(`Error descargando HTML: ${error.message}`);
+            Logger.error(`Error descargando HTML del formulario: ${error.message}`);
         }
     }
 
