@@ -2,6 +2,7 @@ const CONFIG = {
     isActive: false,
     vehicleType: "car",
     parkings: [],
+    priorityParkings: ["PARQUEO CIT-T", "PARQUEO A7-T", "PARQUEO 9-T"],
     refreshInterval: 10000,
     alertUrl: "",
     vehicleData: {
@@ -166,9 +167,6 @@ class ParkingMonitor {
                 const parkingInfo = this._extractParkingInfo(row);
                 if (!parkingInfo) continue;
 
-                const shouldMonitor = this._shouldMonitorParking(parkingInfo.name);
-                if (!shouldMonitor) continue;
-
                 results.push(parkingInfo);
 
                 if (parkingInfo.available > 0) {
@@ -177,6 +175,9 @@ class ParkingMonitor {
                         state.refreshTimer = null;
                         Logger.info("Timer de refresco detenido - Espacio encontrado");
                     }
+
+                    const isPriority = CONFIG.priorityParkings.includes(parkingInfo.name);
+                    parkingInfo.isPriority = isPriority;
 
                     this._handleAvailableParking(parkingInfo);
                     return;
@@ -214,13 +215,6 @@ class ParkingMonitor {
         };
     }
 
-    static _shouldMonitorParking(parkingName) {
-        if (CONFIG.parkings.length === 0) return true;
-
-        const parkingNameUpper = parkingName.toUpperCase();
-        return CONFIG.parkings.some((p) => parkingNameUpper.includes(p.toUpperCase()));
-    }
-
     static _handleAvailableParking(parkingInfo) {
         CONFIG.isActive = false;
 
@@ -231,8 +225,11 @@ class ParkingMonitor {
 
         BotController.stop();
 
+        const priorityLabel = parkingInfo.isPriority ? " [PRIORITARIO]" : " [REVISAR MANUALMENTE]";
+        Logger.info(`Espacio encontrado: ${parkingInfo.name}${priorityLabel}`);
+
         setTimeout(() => {
-            AutoBuyer.tryToBuy(parkingInfo.name);
+            AutoBuyer.tryToBuy(parkingInfo.name, parkingInfo.isPriority);
         }, 100);
 
         NotificationManager.show(parkingInfo);
@@ -258,8 +255,12 @@ class ParkingMonitor {
 }
 
 class AutoBuyer {
-    static async tryToBuy(parkingName) {
+    static currentParkingIsPriority = false;
+
+    static async tryToBuy(parkingName, isPriority) {
         try {
+            this.currentParkingIsPriority = isPriority;
+
             Logger.info("Iniciando compra automática");
 
             const buyButton = this._findBuyButton(parkingName);
@@ -392,9 +393,16 @@ class AutoBuyer {
             });
 
         if (submitButton) {
-            Logger.info(`✅ SUBMIT: ${submitButton.textContent.trim()}`);
-            submitButton.click();
-            Logger.info("🎉 ¡COMPRA COMPLETADA!");
+            Logger.info(`✅ SUBMIT ENCONTRADO: ${submitButton.textContent.trim()}`);
+
+            if (this.currentParkingIsPriority) {
+                Logger.info("🎯 PARQUEO PRIORITARIO - Haciendo clic automático");
+                submitButton.click();
+                Logger.info("🎉 ¡COMPRA COMPLETADA!");
+            } else {
+                Logger.info("⚠️ PARQUEO NO PRIORITARIO - Formulario llenado pero SIN clic automático");
+                Logger.info("👉 Revisa el formulario y haz clic manualmente si te interesa");
+            }
         } else {
             Logger.error("❌ NO SE ENCONTRÓ SUBMIT");
             Logger.info("Botones disponibles:");
