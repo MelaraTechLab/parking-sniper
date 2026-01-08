@@ -1,7 +1,7 @@
 let state = {
     isActive: false,
     vehicleType: "car",
-    parkings: [],
+    priorityParkings: [],
     refreshInterval: 10,
     alertUrl: "",
     vehicleData: {
@@ -26,12 +26,12 @@ const elements = {
     toggleBtnLabel: document.querySelector("#toggleBtn .btn-label"),
     statusIndicator: document.getElementById("statusIndicator"),
     statusText: document.getElementById("statusText"),
-    parkingsList: document.getElementById("parkingsList"),
-    addParkingBtn: document.getElementById("addParkingBtn"),
-    addParkingModal: document.getElementById("addParkingModal"),
-    parkingName: document.getElementById("parkingName"),
-    saveParkingBtn: document.getElementById("saveParkingBtn"),
-    cancelParkingBtn: document.getElementById("cancelParkingBtn"),
+    priorityParkingsList: document.getElementById("priorityParkingsList"),
+    addPriorityParkingBtn: document.getElementById("addPriorityParkingBtn"),
+    addPriorityParkingModal: document.getElementById("addPriorityParkingModal"),
+    priorityParkingName: document.getElementById("priorityParkingName"),
+    savePriorityParkingBtn: document.getElementById("savePriorityParkingBtn"),
+    cancelPriorityParkingBtn: document.getElementById("cancelPriorityParkingBtn"),
     refreshInterval: document.getElementById("refreshInterval"),
     alertUrl: document.getElementById("alertUrl"),
     vehiclePlate: document.getElementById("vehiclePlate"),
@@ -49,10 +49,10 @@ async function init() {
 }
 
 async function loadState() {
-    const data = await chrome.storage.local.get(["isActive", "vehicleType", "parkings", "refreshInterval", "alertUrl", "vehicleData", "logs"]);
+    const data = await chrome.storage.local.get(["isActive", "vehicleType", "priorityParkings", "refreshInterval", "alertUrl", "vehicleData", "logs"]);
     state.isActive = data.isActive || false;
     state.vehicleType = data.vehicleType || "car";
-    state.parkings = data.parkings || [];
+    state.priorityParkings = data.priorityParkings || [];
     state.refreshInterval = data.refreshInterval || 10;
     state.alertUrl = data.alertUrl || "";
     state.vehicleData = data.vehicleData || { plate: "", brand: "", model: "", color: "" };
@@ -65,9 +65,9 @@ async function saveState() {
 
 function setupEventListeners() {
     elements.toggleBtn.addEventListener("click", toggleBot);
-    elements.addParkingBtn.addEventListener("click", showAddParkingModal);
-    elements.saveParkingBtn.addEventListener("click", saveParking);
-    elements.cancelParkingBtn.addEventListener("click", hideAddParkingModal);
+    elements.addPriorityParkingBtn.addEventListener("click", showAddPriorityParkingModal);
+    elements.savePriorityParkingBtn.addEventListener("click", savePriorityParking);
+    elements.cancelPriorityParkingBtn.addEventListener("click", hideAddPriorityParkingModal);
     elements.refreshInterval.addEventListener("change", updateRefreshInterval);
     elements.alertUrl.addEventListener("change", updateAlertUrl);
 
@@ -90,7 +90,7 @@ async function toggleBot() {
         action: state.isActive ? "start" : "stop",
         config: {
             vehicleType: state.vehicleType,
-            parkings: state.parkings,
+            priorityParkings: state.priorityParkings,
             refreshInterval: state.refreshInterval * 1000,
             alertUrl: state.alertUrl,
             vehicleData: state.vehicleData,
@@ -132,16 +132,16 @@ function updateUI() {
 }
 
 function renderParkings() {
-    if (state.parkings.length === 0) {
-        elements.parkingsList.innerHTML = `
+    if (state.priorityParkings.length === 0) {
+        elements.priorityParkingsList.innerHTML = `
             <div class="empty-state">
-                No hay parqueos configurados. Usa el botón para agregar uno nuevo.
+                No hay parqueos prioritarios configurados. Usa el botón para agregar uno nuevo.
             </div>
         `;
         return;
     }
 
-    elements.parkingsList.innerHTML = state.parkings
+    elements.priorityParkingsList.innerHTML = state.priorityParkings
         .map(
             (parking, index) => `
                 <article class="parking-item">
@@ -157,50 +157,50 @@ function renderParkings() {
     document.querySelectorAll(".delete-btn").forEach((btn) => {
         btn.addEventListener("click", (e) => {
             const index = parseInt(e.currentTarget.dataset.index, 10);
-            deleteParking(index);
+            deletePriorityParking(index);
         });
     });
 }
 
-function showAddParkingModal() {
-    elements.addParkingModal.style.display = "flex";
-    elements.parkingName.value = "";
-    elements.parkingName.focus();
+function showAddPriorityParkingModal() {
+    elements.addPriorityParkingModal.style.display = "flex";
+    elements.priorityParkingName.value = "";
+    elements.priorityParkingName.focus();
 }
 
-function hideAddParkingModal() {
-    elements.addParkingModal.style.display = "none";
+function hideAddPriorityParkingModal() {
+    elements.addPriorityParkingModal.style.display = "none";
 }
 
-async function saveParking() {
-    const name = elements.parkingName.value.trim().toUpperCase();
+async function savePriorityParking() {
+    const name = elements.priorityParkingName.value.trim().toUpperCase();
 
     if (!name) {
-        alert("Por favor completa el nombre del parqueo");
+        alert("Por favor completa el nombre del parqueo prioritario");
         return;
     }
 
-    const exists = state.parkings.some((p) => p === name);
+    const exists = state.priorityParkings.some((p) => p === name);
     if (exists) {
-        alert("Este parqueo ya está en la lista");
+        alert("Este parqueo prioritario ya está en la lista");
         return;
     }
 
-    state.parkings.push(name);
+    state.priorityParkings.push(name);
     await saveState();
 
-    hideAddParkingModal();
+    hideAddPriorityParkingModal();
     updateUI();
-    addLog(`Parqueo agregado: ${name}`);
+    addLog(`Parqueo prioritario agregado: ${name}`);
 }
 
-async function deleteParking(index) {
-    const parking = state.parkings[index];
-    if (confirm(`¿Eliminar ${parking}?`)) {
-        state.parkings.splice(index, 1);
+async function deletePriorityParking(index) {
+    const parking = state.priorityParkings[index];
+    if (confirm(`¿Eliminar ${parking} de prioritarios?`)) {
+        state.priorityParkings.splice(index, 1);
         await saveState();
         updateUI();
-        addLog(`Parqueo eliminado: ${parking}`);
+        addLog(`Parqueo prioritario eliminado: ${parking}`);
     }
 }
 

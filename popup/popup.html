@@ -87,17 +87,19 @@
                     <svg viewBox="0 0 24 24" role="presentation">
                         <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                     </svg>
-                    <span>Parqueos a monitorear</span>
+                    <span>Parqueos prioritarios (auto-compra)</span>
                 </div>
-                <div id="parkingsList" class="parkings-list"></div>
-                <button id="addParkingBtn" class="btn btn-secondary ghost-btn">
+                <p class="muted">Parqueos donde el bot comprará automáticamente sin pedir confirmación.</p>
+                <div id="priorityParkingsList" class="parkings-list"></div>
+                <button id="addPriorityParkingBtn" class="btn btn-secondary ghost-btn">
                     <span class="btn-icon" aria-hidden="true">
                         <svg class="icon" viewBox="0 0 24 24" role="presentation">
                             <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
                         </svg>
                     </span>
-                    <span>Agregar parqueo</span>
+                    <span>Agregar prioritario</span>
                 </button>
+                <p class="helper-text">Ej: PARQUEO CIT - T, PARQUEO 7A - T, PARQUEO 9 - T</p>
             </section>
 
             <section class="card interval-section">
@@ -164,7 +166,7 @@
             </section>
         </div>
 
-        <div id="addParkingModal" class="modal" style="display: none;">
+        <div id="addPriorityParkingModal" class="modal" style="display: none;">
             <div class="modal-content">
                 <div class="modal-header">
                     <div class="modal-icon" aria-hidden="true">
@@ -174,17 +176,17 @@
                         </svg>
                     </div>
                     <div>
-                        <p class="modal-kicker">Nuevo parqueo</p>
-                        <h3>Agregar parqueo a monitorear</h3>
+                        <p class="modal-kicker">Parqueo prioritario</p>
+                        <h3>Agregar parqueo con auto-compra</h3>
                     </div>
                 </div>
-                <label for="parkingName">Nombre del parqueo</label>
-                <input type="text" id="parkingName" placeholder="Ej: PARQUEO CIT - T" />
+                <label for="priorityParkingName">Nombre exacto del parqueo</label>
+                <input type="text" id="priorityParkingName" placeholder="PARQUEO CIT - T" />
 
-                <p class="helper-text">Ingresa el nombre exacto del parqueo como aparece en el sistema.</p>
+                <p class="helper-text">⚠️ Debe ser EXACTO como aparece en el sistema. El bot comprará automáticamente si encuentra espacio aquí.</p>
 
                 <div class="modal-buttons">
-                    <button id="saveParkingBtn" class="btn btn-primary">
+                    <button id="savePriorityParkingBtn" class="btn btn-primary">
                         <span class="btn-icon" aria-hidden="true">
                             <svg class="icon" viewBox="0 0 24 24" role="presentation">
                                 <path d="M6 12.5 10 16l8-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
@@ -192,7 +194,7 @@
                         </span>
                         <span>Guardar</span>
                     </button>
-                    <button id="cancelParkingBtn" class="btn btn-secondary ghost-btn">
+                    <button id="cancelPriorityParkingBtn" class="btn btn-secondary ghost-btn">
                         <span class="btn-icon" aria-hidden="true">
                             <svg class="icon" viewBox="0 0 24 24" role="presentation">
                                 <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />

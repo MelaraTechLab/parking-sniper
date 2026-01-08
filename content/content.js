@@ -2,7 +2,7 @@ const CONFIG = {
     isActive: false,
     vehicleType: "car",
     parkings: [],
-    priorityParkings: ["PARQUEO CIT-T", "PARQUEO A7-T", "PARQUEO 9-T"],
+    priorityParkings: [],
     refreshInterval: 10000,
     alertUrl: "",
     vehicleData: {
@@ -20,6 +20,7 @@ let state = {
     hasProcessedCurrentPage: false,
     lastPageChange: Date.now(),
     watchdogTimer: null,
+    isFillingForm: false,
 };
 
 class Logger {
@@ -246,6 +247,12 @@ class ParkingMonitor {
                     state.refreshTimer = null;
                     return;
                 }
+
+                if (state.isFillingForm) {
+                    Logger.info("🛡️  Reload bloqueado: Formulario en proceso");
+                    return;
+                }
+
                 window.location.reload();
             }, CONFIG.refreshInterval);
 
@@ -261,7 +268,18 @@ class AutoBuyer {
         try {
             this.currentParkingIsPriority = isPriority;
 
-            Logger.info("Iniciando compra automática");
+            if (state.refreshTimer) {
+                clearInterval(state.refreshTimer);
+                state.refreshTimer = null;
+                Logger.info("🛡️  Timer de refresco detenido PERMANENTEMENTE");
+            }
+            if (state.watchdogTimer) {
+                clearInterval(state.watchdogTimer);
+                state.watchdogTimer = null;
+                Logger.info("🛡️  Watchdog detenido PERMANENTEMENTE");
+            }
+
+            Logger.info("🚀 Iniciando compra automática");
 
             const buyButton = this._findBuyButton(parkingName);
             if (!buyButton) {
@@ -269,7 +287,7 @@ class AutoBuyer {
                 return;
             }
 
-            Logger.info("Haciendo clic en Comprar");
+            Logger.info("👆 Haciendo clic en botón COMPRAR...");
             buyButton.click();
 
             setTimeout(() => {
@@ -332,83 +350,169 @@ class AutoBuyer {
     }
 
     static _fillFormAggressive() {
-        Logger.info("LLENADO AGRESIVO INICIADO");
+        state.isFillingForm = true;
+        Logger.info("🔧 LLENADO AGRESIVO INICIADO");
+        Logger.info("🛡️  PROTECCIÓN ACTIVADA: Página bloqueada contra reloads");
 
         const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input:not([type])');
         const selects = document.querySelectorAll('select');
 
-        Logger.info(`Encontrados ${inputs.length} inputs y ${selects.length} selects`);
+        Logger.info(`📋 Encontrados: ${inputs.length} inputs, ${selects.length} selects`);
 
-        inputs.forEach((input, index) => {
-            const name = (input.name || input.id || input.placeholder || "").toLowerCase();
+        if (inputs.length === 0 && selects.length === 0) {
+            Logger.error("⚠️ NO SE ENCONTRARON CAMPOS EN EL FORMULARIO");
+            state.isFillingForm = false;
+            return;
+        }
 
-            if (name.includes('placa') || name.includes('plate')) {
-                const plate = CONFIG.vehicleData.plate || "XXXX";
-                const maxLen = input.maxLength > 0 ? input.maxLength : 7;
-                input.value = plate.substring(0, maxLen);
-                Logger.info(`[${index}] Placa: ${input.value}`);
-            } else if (input.type === 'number' || name.includes('modelo') || name.includes('año')) {
-                input.value = CONFIG.vehicleData.model || "2020";
-                Logger.info(`[${index}] Número: ${input.value}`);
-            } else {
-                input.value = CONFIG.vehicleData.brand || "Toyota";
-                Logger.info(`[${index}] Texto: ${input.value}`);
-            }
-
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            input.dispatchEvent(new Event('blur', { bubbles: true }));
-        });
-
+        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        Logger.info("📝 LLENANDO SELECTS (desplegables):");
         selects.forEach((select, index) => {
-            if (select.options.length > 1) {
-                select.selectedIndex = 1;
-                Logger.info(`[${index}] Select: ${select.options[1].text}`);
-                select.dispatchEvent(new Event('change', { bubbles: true }));
+            try {
+                if (select.options.length > 1) {
+                    select.selectedIndex = 1;
+                    const selectedText = select.options[1].text.trim();
+                    Logger.info(`  ✓ Select [${index}]: "${selectedText}"`);
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                    select.dispatchEvent(new Event('blur', { bubbles: true }));
+                } else {
+                    Logger.info(`  ⊘ Select [${index}]: solo 1 opción, skip`);
+                }
+            } catch (error) {
+                Logger.error(`  ✗ Select [${index}]: Error - ${error.message}`);
             }
         });
+
+        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        Logger.info("✍️  LLENANDO INPUTS (campos de texto):");
+        inputs.forEach((input, index) => {
+            try {
+                const name = (input.name || input.id || input.placeholder || "").toLowerCase();
+                const type = input.type || "text";
+
+                Logger.info(`  [${index}] Campo: name="${input.name}", id="${input.id}", type="${type}"`);
+
+                if (name.includes('placa') || name.includes('plate')) {
+                    const plate = CONFIG.vehicleData.plate || "ABC123";
+                    const maxLen = input.maxLength > 0 ? input.maxLength : plate.length;
+                    input.value = plate.substring(0, maxLen);
+                    Logger.info(`    ✓ PLACA → "${input.value}" (max: ${maxLen})`);
+                } else if (type === 'number' || name.includes('modelo') || name.includes('año') || name.includes('year')) {
+                    const model = CONFIG.vehicleData.model || "2020";
+                    input.value = model;
+                    Logger.info(`    ✓ MODELO/AÑO → "${input.value}"`);
+                } else {
+                    Logger.info(`    ⊘ Campo "${input.name || input.id}" ignorado (probablemente desplegable)`);
+                }
+
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new Event('blur', { bubbles: true }));
+            } catch (error) {
+                Logger.error(`  ✗ Input [${index}]: Error - ${error.message}`);
+            }
+        });
+
+        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        Logger.info("⏳ Esperando 500ms antes de buscar botón submit...");
 
         setTimeout(() => {
             this._submitFormAggressive();
-        }, 300);
+        }, 500);
     }
 
     static _submitFormAggressive() {
-        Logger.info("BUSCANDO BOTÓN SUBMIT");
+        Logger.info("🔍 BÚSQUEDA DE BOTÓN SUBMIT");
 
-        const allButtons = document.querySelectorAll('button');
-        Logger.info(`Total botones: ${allButtons.length}`);
+        const allButtons = document.querySelectorAll('button, input[type="submit"], input[type="button"]');
+        const allButtonsArray = Array.from(allButtons);
 
-        const submitButton = document.querySelector('button[type="submit"]') ||
-            document.querySelector('button.btn-success') ||
-            document.querySelector('button.btn-primary') ||
-            Array.from(allButtons).find(btn => {
-                const text = btn.textContent.toLowerCase();
-                return text.includes('reservar') ||
-                    text.includes('confirmar') ||
-                    text.includes('comprar') ||
-                    text.includes('guardar') ||
-                    text.includes('enviar') ||
-                    text.includes('continuar');
-            });
+        Logger.info(`📊 Total de botones encontrados: ${allButtonsArray.length}`);
+
+        if (allButtonsArray.length === 0) {
+            Logger.error("❌ NO HAY NINGÚN BOTÓN EN LA PÁGINA");
+            return;
+        }
+
+        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        Logger.info("📋 Lista completa de botones:");
+        allButtonsArray.forEach((btn, i) => {
+            const text = btn.textContent?.trim() || btn.value || "(sin texto)";
+            const type = btn.type || "button";
+            const classes = btn.className || "(sin clases)";
+            Logger.info(`  [${i}] "${text}" | type="${type}" | class="${classes}"`);
+        });
+        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        let submitButton = null;
+
+        submitButton = document.querySelector('button[type="submit"]') ||
+            document.querySelector('input[type="submit"]');
+        if (submitButton) {
+            Logger.info(`✅ Método 1: Encontrado por type="submit"`);
+        }
+
+        if (!submitButton) {
+            submitButton = document.querySelector('button.btn-success') ||
+                document.querySelector('button.btn-primary');
+            if (submitButton) {
+                Logger.info(`✅ Método 2: Encontrado por clase Bootstrap`);
+            }
+        }
+
+        if (!submitButton) {
+            const keywords = ['reservar', 'confirmar', 'comprar', 'guardar', 'enviar', 'continuar', 'aceptar', 'submit'];
+            for (const keyword of keywords) {
+                submitButton = allButtonsArray.find(btn => {
+                    const text = (btn.textContent || btn.value || "").toLowerCase();
+                    return text.includes(keyword);
+                });
+                if (submitButton) {
+                    Logger.info(`✅ Método 3: Encontrado por keyword "${keyword}"`);
+                    break;
+                }
+            }
+        }
+
+        if (!submitButton && allButtonsArray.length === 1) {
+            submitButton = allButtonsArray[0];
+            Logger.info(`✅ Método 4: Solo hay 1 botón, asumo que es el submit`);
+        }
+
+        if (!submitButton && allButtonsArray.length > 0) {
+            submitButton = allButtonsArray[allButtonsArray.length - 1];
+            Logger.info(`⚠️ Método 5 (fallback): Usando último botón de la página`);
+        }
 
         if (submitButton) {
-            Logger.info(`✅ SUBMIT ENCONTRADO: ${submitButton.textContent.trim()}`);
+            const btnText = submitButton.textContent?.trim() || submitButton.value || "(sin texto)";
+            Logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            Logger.info(`🎯 BOTÓN SELECCIONADO: "${btnText}"`);
+            Logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
             if (this.currentParkingIsPriority) {
-                Logger.info("🎯 PARQUEO PRIORITARIO - Haciendo clic automático");
-                submitButton.click();
-                Logger.info("🎉 ¡COMPRA COMPLETADA!");
+                Logger.info("🚀 PARQUEO PRIORITARIO → CLIC AUTOMÁTICO");
+                try {
+                    submitButton.click();
+                    Logger.info("✅ ¡CLIC EJECUTADO!");
+                    Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                    Logger.info("🎉 ¡COMPRA AUTOMÁTICA COMPLETADA!");
+                    Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                    Logger.info("👁️  Verifica la siguiente pantalla para confirmar el pago/reserva");
+                } catch (error) {
+                    Logger.error(`❌ Error al hacer clic: ${error.message}`);
+                }
             } else {
-                Logger.info("⚠️ PARQUEO NO PRIORITARIO - Formulario llenado pero SIN clic automático");
-                Logger.info("👉 Revisa el formulario y haz clic manualmente si te interesa");
+                Logger.info("⏸️  PARQUEO NO PRIORITARIO → SIN CLIC AUTOMÁTICO");
+                Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                Logger.info("📝 ✅ Formulario llenado correctamente");
+                Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                Logger.info("👉 Revisa los datos y haz clic en \"" + btnText + "\" si quieres este parqueo");
+                Logger.info("⚠️  Si NO te interesa, simplemente cierra esta pestaña");
             }
         } else {
-            Logger.error("❌ NO SE ENCONTRÓ SUBMIT");
-            Logger.info("Botones disponibles:");
-            allButtons.forEach((btn, i) => {
-                Logger.info(`  [${i}] ${btn.textContent.trim()}`);
-            });
+            Logger.error("❌❌❌ NO SE PUDO ENCONTRAR NINGÚN BOTÓN SUBMIT ❌❌❌");
+            Logger.error("Esto no debería pasar. Revisa el HTML descargado.");
         }
     }
 }
@@ -523,6 +627,7 @@ class BotController {
         CONFIG.isActive = true;
         CONFIG.vehicleType = config.vehicleType;
         CONFIG.parkings = config.parkings;
+        CONFIG.priorityParkings = config.priorityParkings || [];
         CONFIG.refreshInterval = config.refreshInterval;
         CONFIG.alertUrl = config.alertUrl || "";
         CONFIG.vehicleData = config.vehicleData || { plate: "", brand: "", model: "", color: "" };
@@ -564,6 +669,10 @@ class BotController {
 
         state.watchdogTimer = setInterval(() => {
             if (!CONFIG.isActive) return;
+
+            if (state.isFillingForm) {
+                return;
+            }
 
             const currentPage = PageDetector.getCurrentPage();
             const timeOnPage = Date.now() - state.lastPageChange;
