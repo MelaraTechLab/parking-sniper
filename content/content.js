@@ -122,9 +122,48 @@ class NavigationController {
     }
 
     static async selectVehicleType() {
-        await sleep(1500);
-
         const vehicleType = CONFIG.vehicleType === "motorcycle" ? "Motocicleta" : "Automóvil";
+        Logger.info(`Esperando botones de tipo de vehículo...`);
+
+        // MutationObserver para esperar que carguen los botones
+        const startTime = Date.now();
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                observer.disconnect();
+                Logger.error("⚠️ Timeout esperando botones de vehículo, intentando de todas formas...");
+                this._clickVehicleButton(vehicleType, resolve);
+            }, 3000);
+
+            const observer = new MutationObserver(() => {
+                const iconMotorcycle = document.querySelector(".fa-motorcycle");
+                const iconCar = document.querySelector(".fa-car");
+
+                if (iconMotorcycle && iconCar) {
+                    observer.disconnect();
+                    clearTimeout(timeout);
+                    const loadTime = Date.now() - startTime;
+                    Logger.info(`✅ Botones cargados en ${loadTime}ms`);
+                    this._clickVehicleButton(vehicleType, resolve);
+                }
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            // Verificar si ya existen
+            const alreadyLoaded = document.querySelector(".fa-motorcycle") && document.querySelector(".fa-car");
+            if (alreadyLoaded) {
+                observer.disconnect();
+                clearTimeout(timeout);
+                Logger.info(`✅ Botones ya estaban cargados`);
+                this._clickVehicleButton(vehicleType, resolve);
+            }
+        });
+    }
+
+    static _clickVehicleButton(vehicleType, resolve) {
         Logger.info(`Seleccionando ${vehicleType}`);
 
         const icon = CONFIG.vehicleType === "motorcycle"
@@ -135,7 +174,8 @@ class NavigationController {
             const button = icon.closest("button");
             if (button) {
                 button.click();
-                return true;
+                resolve(true);
+                return;
             }
         }
 
@@ -143,12 +183,13 @@ class NavigationController {
         for (const span of spans) {
             if (span.textContent.trim() === vehicleType) {
                 span.click();
-                return true;
+                resolve(true);
+                return;
             }
         }
 
         Logger.error("No se encontró el botón de tipo de vehículo");
-        return false;
+        resolve(false);
     }
 }
 
@@ -239,24 +280,89 @@ class ParkingMonitor {
 
     static start() {
         if (CONFIG.isActive && state.refreshTimer === null) {
-            this.checkAvailability();
+            Logger.info("⏳ Esperando que cargue la tabla de parqueos...");
+            const startTime = Date.now();
 
-            state.refreshTimer = setInterval(() => {
-                if (!CONFIG.isActive) {
-                    clearInterval(state.refreshTimer);
-                    state.refreshTimer = null;
-                    return;
+            // MutationObserver para esperar que carguen los badges de disponibilidad
+            const observer = new MutationObserver(() => {
+                const badges = document.querySelectorAll(".badge.badge-primary");
+                let hasParkingBadges = false;
+
+                for (const badge of badges) {
+                    if (badge.textContent.includes("Disponibles:")) {
+                        hasParkingBadges = true;
+                        break;
+                    }
                 }
 
-                if (state.isFillingForm) {
-                    Logger.info("🛡️  Reload bloqueado: Formulario en proceso");
-                    return;
+                if (hasParkingBadges) {
+                    observer.disconnect();
+                    const loadTime = Date.now() - startTime;
+                    Logger.info(`✅ Tabla cargada en ${loadTime}ms`);
+
+                    // Primera revisión inmediata
+                    this.checkAvailability();
+
+                    // Setup del timer de refresco
+                    state.refreshTimer = setInterval(() => {
+                        if (!CONFIG.isActive) {
+                            clearInterval(state.refreshTimer);
+                            state.refreshTimer = null;
+                            return;
+                        }
+
+                        if (state.isFillingForm) {
+                            Logger.info("🛡️  Reload bloqueado: Formulario en proceso");
+                            return;
+                        }
+
+                        window.location.reload();
+                    }, CONFIG.refreshInterval);
+
+                    Logger.info("Monitoreo iniciado");
                 }
+            });
 
-                window.location.reload();
-            }, CONFIG.refreshInterval);
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
 
-            Logger.info("Monitoreo iniciado");
+            // Verificar si ya está cargado
+            const badges = document.querySelectorAll(".badge.badge-primary");
+            let alreadyLoaded = false;
+            for (const badge of badges) {
+                if (badge.textContent.includes("Disponibles:")) {
+                    alreadyLoaded = true;
+                    break;
+                }
+            }
+
+            if (alreadyLoaded) {
+                observer.disconnect();
+                Logger.info(`✅ Tabla ya estaba cargada`);
+
+                // Primera revisión inmediata
+                this.checkAvailability();
+
+                // Setup del timer de refresco
+                state.refreshTimer = setInterval(() => {
+                    if (!CONFIG.isActive) {
+                        clearInterval(state.refreshTimer);
+                        state.refreshTimer = null;
+                        return;
+                    }
+
+                    if (state.isFillingForm) {
+                        Logger.info("🛡️  Reload bloqueado: Formulario en proceso");
+                        return;
+                    }
+
+                    window.location.reload();
+                }, CONFIG.refreshInterval);
+
+                Logger.info("Monitoreo iniciado");
+            }
         }
     }
 }
@@ -600,8 +706,14 @@ class AutoBuyer {
                     Logger.info("🎉 ¡COMPRA AUTOMÁTICA COMPLETADA!");
                     Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                     Logger.info("👁️  Verifica la siguiente pantalla para confirmar");
+
+                    // Liberar flag después de clic exitoso
+                    setTimeout(() => {
+                        state.isFillingForm = false;
+                    }, 1000);
                 } catch (error) {
                     Logger.error(`❌ Error al hacer clic: ${error.message}`);
+                    state.isFillingForm = false;
                 }
             } else {
                 Logger.info("⏸️  PARQUEO NO PRIORITARIO → SIN CLIC AUTOMÁTICO");
@@ -609,10 +721,14 @@ class AutoBuyer {
                 Logger.info("📝 ✅ Formulario llenado correctamente");
                 Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                 Logger.info("👉 Revisa los datos y haz clic en 'Guardar' si te interesa");
+
+                // Liberar flag para permitir interacción manual
+                state.isFillingForm = false;
             }
         } else {
             Logger.error("❌ NO SE ENCONTRÓ BOTÓN SUBMIT");
             Logger.error("Revisa el HTML descargado para verificar el formulario");
+            state.isFillingForm = false;
         }
     }
 }
@@ -829,9 +945,10 @@ class PageObserver {
             if (detectedPage && !state.hasProcessedCurrentPage) {
                 state.hasProcessedCurrentPage = true;
 
+                // Reducido de 1500ms a 200ms - cada handler ahora espera sus propios elementos
                 setTimeout(() => {
                     BotController._handlePageNavigation(detectedPage);
-                }, 1500);
+                }, 200);
             }
         });
 
