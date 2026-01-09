@@ -291,37 +291,11 @@ class AutoBuyer {
             buyButton.click();
 
             setTimeout(() => {
-                this._downloadPageHTML();
                 this._fillFormAggressive();
             }, 2500);
 
         } catch (error) {
             Logger.error(`Error en compra automática: ${error.message}`);
-        }
-    }
-
-    static _downloadPageHTML() {
-        try {
-            Logger.info("📥 Iniciando descarga de HTML del formulario...");
-            const html = document.documentElement.outerHTML;
-            Logger.info(`📄 HTML capturado: ${html.length} caracteres`);
-
-            const blob = new Blob([html], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `parking-FORM-${Date.now()}.html`;
-
-            Logger.info(`💾 Descargando como: ${a.download}`);
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            Logger.info("✅ HTML del formulario descargado exitosamente");
-        } catch (error) {
-            Logger.error(`❌ Error descargando HTML del formulario: ${error.message}`);
-            Logger.error(`Stack: ${error.stack}`);
         }
     }
 
@@ -356,99 +330,104 @@ class AutoBuyer {
         return null;
     }
 
-    static _fillFormAggressive() {
+    static async _fillFormAggressive() {
         state.isFillingForm = true;
-        Logger.info("🔧 LLENADO AGRESIVO INICIADO");
+        Logger.info("🔧 LLENADO ESPECÍFICO INICIADO");
         Logger.info("🛡️  PROTECCIÓN ACTIVADA: Página bloqueada contra reloads");
+        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input:not([type])');
-        const selects = document.querySelectorAll('select');
-        const radios = document.querySelectorAll('input[type="radio"]');
+        try {
+            // 1. Radio button tipo de vehículo (seleccionar primero: automóvil)
+            const radioAutomovil = document.getElementById('datosVehiculoForm_automovil');
+            if (radioAutomovil) {
+                radioAutomovil.checked = true;
+                radioAutomovil.dispatchEvent(new Event('change', { bubbles: true }));
+                radioAutomovil.dispatchEvent(new Event('click', { bubbles: true }));
+                Logger.info("✅ Tipo vehículo: Automóvil");
+            } else {
+                Logger.error("❌ No se encontró radio button automóvil");
+            }
 
-        Logger.info(`📋 Encontrados: ${inputs.length} inputs, ${selects.length} selects, ${radios.length} radios`);
+            // 2. Select Marca (primera opción)
+            const selectMarca = document.getElementById('marca');
+            if (selectMarca && selectMarca.options.length > 0) {
+                selectMarca.selectedIndex = 0;
+                const marcaText = selectMarca.options[0].text.trim();
+                Logger.info(`✅ Marca: ${marcaText}`);
+                selectMarca.dispatchEvent(new Event('change', { bubbles: true }));
+                selectMarca.dispatchEvent(new Event('blur', { bubbles: true }));
+            } else {
+                Logger.error("❌ No se encontró select de marca");
+            }
 
-        if (inputs.length === 0 && selects.length === 0 && radios.length === 0) {
-            Logger.error("⚠️ NO SE ENCONTRARON CAMPOS EN EL FORMULARIO");
-            state.isFillingForm = false;
-            return;
+            // Esperar 200ms para que se carguen las opciones de color dinámicamente
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // 3. Select Color (primera opción disponible)
+            const selectColor = document.getElementById('color');
+            if (selectColor) {
+                if (selectColor.options.length > 1) {
+                    // Si hay opciones cargadas, seleccionar la primera real (no "Seleccione...")
+                    selectColor.selectedIndex = 1;
+                    const colorText = selectColor.options[1].text.trim();
+                    Logger.info(`✅ Color: ${colorText}`);
+                } else if (selectColor.options.length === 1) {
+                    // Si solo hay 1 opción (probablemente "OTRO COLOR")
+                    selectColor.selectedIndex = 0;
+                    const colorText = selectColor.options[0].text.trim();
+                    Logger.info(`✅ Color: ${colorText}`);
+                } else {
+                    Logger.error("❌ Select de color sin opciones");
+                }
+                selectColor.dispatchEvent(new Event('change', { bubbles: true }));
+                selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
+            } else {
+                Logger.error("❌ No se encontró select de color");
+            }
+
+            // 4. Placa Letra (primera opción: P)
+            const selectPlacaLetra = document.getElementById('placa_letra');
+            if (selectPlacaLetra && selectPlacaLetra.options.length > 0) {
+                selectPlacaLetra.selectedIndex = 0;
+                const letraText = selectPlacaLetra.options[0].text.trim();
+                Logger.info(`✅ Placa letra: ${letraText}`);
+                selectPlacaLetra.dispatchEvent(new Event('change', { bubbles: true }));
+                selectPlacaLetra.dispatchEvent(new Event('blur', { bubbles: true }));
+            } else {
+                Logger.error("❌ No se encontró select de placa letra");
+            }
+
+            // 5. Placa Número (extraer números de la placa del config)
+            const inputPlacaNumero = document.getElementById('placa_numero');
+            if (inputPlacaNumero) {
+                const placa = CONFIG.vehicleData.plate || "000000";
+                const soloNumeros = placa.replace(/[^0-9]/g, '');
+                const placaNumero = soloNumeros.substring(0, 6).padStart(6, '0');
+                inputPlacaNumero.value = placaNumero;
+                Logger.info(`✅ Placa número: ${placaNumero}`);
+                inputPlacaNumero.dispatchEvent(new Event('input', { bubbles: true }));
+                inputPlacaNumero.dispatchEvent(new Event('change', { bubbles: true }));
+                inputPlacaNumero.dispatchEvent(new Event('blur', { bubbles: true }));
+            } else {
+                Logger.error("❌ No se encontró input de placa número");
+            }
+
+            // 6. Modelo
+            const inputModelo = document.getElementById('modelo');
+            if (inputModelo) {
+                const modelo = CONFIG.vehicleData.model || "2020";
+                inputModelo.value = modelo;
+                Logger.info(`✅ Modelo: ${modelo}`);
+                inputModelo.dispatchEvent(new Event('input', { bubbles: true }));
+                inputModelo.dispatchEvent(new Event('change', { bubbles: true }));
+                inputModelo.dispatchEvent(new Event('blur', { bubbles: true }));
+            } else {
+                Logger.error("❌ No se encontró input de modelo");
+            }
+
+        } catch (error) {
+            Logger.error(`❌ Error llenando formulario: ${error.message}`);
         }
-
-        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        Logger.info("🔘 LLENANDO RADIO BUTTONS (opciones múltiples):");
-        const radioGroups = {};
-        radios.forEach((radio) => {
-            const groupName = radio.name;
-            if (!radioGroups[groupName]) {
-                radioGroups[groupName] = [];
-            }
-            radioGroups[groupName].push(radio);
-        });
-
-        Object.keys(radioGroups).forEach((groupName, groupIndex) => {
-            try {
-                const group = radioGroups[groupName];
-                if (group.length > 0) {
-                    const firstRadio = group[0];
-                    firstRadio.checked = true;
-                    const label = firstRadio.nextElementSibling?.textContent?.trim() ||
-                                  firstRadio.parentElement?.textContent?.trim() ||
-                                  firstRadio.value || "(sin label)";
-                    Logger.info(`  ✓ Radio [${groupIndex}] "${groupName}": "${label}" (${group.length} opciones)`);
-                    firstRadio.dispatchEvent(new Event('change', { bubbles: true }));
-                    firstRadio.dispatchEvent(new Event('click', { bubbles: true }));
-                }
-            } catch (error) {
-                Logger.error(`  ✗ Radio group [${groupIndex}] "${groupName}": Error - ${error.message}`);
-            }
-        });
-
-        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        Logger.info("📝 LLENANDO SELECTS (desplegables):");
-        selects.forEach((select, index) => {
-            try {
-                if (select.options.length > 1) {
-                    select.selectedIndex = 1;
-                    const selectedText = select.options[1].text.trim();
-                    Logger.info(`  ✓ Select [${index}]: "${selectedText}"`);
-                    select.dispatchEvent(new Event('change', { bubbles: true }));
-                    select.dispatchEvent(new Event('blur', { bubbles: true }));
-                } else {
-                    Logger.info(`  ⊘ Select [${index}]: solo 1 opción, skip`);
-                }
-            } catch (error) {
-                Logger.error(`  ✗ Select [${index}]: Error - ${error.message}`);
-            }
-        });
-
-        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        Logger.info("✍️  LLENANDO INPUTS (campos de texto):");
-        inputs.forEach((input, index) => {
-            try {
-                const name = (input.name || input.id || input.placeholder || "").toLowerCase();
-                const type = input.type || "text";
-
-                Logger.info(`  [${index}] Campo: name="${input.name}", id="${input.id}", type="${type}"`);
-
-                if (name.includes('placa') || name.includes('plate')) {
-                    const plate = CONFIG.vehicleData.plate || "ABC123";
-                    const maxLen = input.maxLength > 0 ? input.maxLength : plate.length;
-                    input.value = plate.substring(0, maxLen);
-                    Logger.info(`    ✓ PLACA → "${input.value}" (max: ${maxLen})`);
-                } else if (type === 'number' || name.includes('modelo') || name.includes('año') || name.includes('year')) {
-                    const model = CONFIG.vehicleData.model || "2020";
-                    input.value = model;
-                    Logger.info(`    ✓ MODELO/AÑO → "${input.value}"`);
-                } else {
-                    Logger.info(`    ⊘ Campo "${input.name || input.id}" ignorado (probablemente desplegable)`);
-                }
-
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-                input.dispatchEvent(new Event('blur', { bubbles: true }));
-            } catch (error) {
-                Logger.error(`  ✗ Input [${index}]: Error - ${error.message}`);
-            }
-        });
 
         Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         Logger.info("⏳ Esperando 500ms antes de buscar botón submit...");
@@ -461,71 +440,17 @@ class AutoBuyer {
     static _submitFormAggressive() {
         Logger.info("🔍 BÚSQUEDA DE BOTÓN SUBMIT");
 
-        const allButtons = document.querySelectorAll('button, input[type="submit"], input[type="button"]');
-        const allButtonsArray = Array.from(allButtons);
-
-        Logger.info(`📊 Total de botones encontrados: ${allButtonsArray.length}`);
-
-        if (allButtonsArray.length === 0) {
-            Logger.error("❌ NO HAY NINGÚN BOTÓN EN LA PÁGINA");
-            return;
-        }
-
-        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        Logger.info("📋 Lista completa de botones:");
-        allButtonsArray.forEach((btn, i) => {
-            const text = btn.textContent?.trim() || btn.value || "(sin texto)";
-            const type = btn.type || "button";
-            const classes = btn.className || "(sin clases)";
-            Logger.info(`  [${i}] "${text}" | type="${type}" | class="${classes}"`);
-        });
-        Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-        let submitButton = null;
-
-        submitButton = document.querySelector('button[type="submit"]') ||
-            document.querySelector('input[type="submit"]');
-        if (submitButton) {
-            Logger.info(`✅ Método 1: Encontrado por type="submit"`);
-        }
-
-        if (!submitButton) {
-            submitButton = document.querySelector('button.btn-success') ||
-                document.querySelector('button.btn-primary');
-            if (submitButton) {
-                Logger.info(`✅ Método 2: Encontrado por clase Bootstrap`);
-            }
-        }
-
-        if (!submitButton) {
-            const keywords = ['reservar', 'confirmar', 'comprar', 'guardar', 'enviar', 'continuar', 'aceptar', 'submit'];
-            for (const keyword of keywords) {
-                submitButton = allButtonsArray.find(btn => {
-                    const text = (btn.textContent || btn.value || "").toLowerCase();
-                    return text.includes(keyword);
-                });
-                if (submitButton) {
-                    Logger.info(`✅ Método 3: Encontrado por keyword "${keyword}"`);
-                    break;
-                }
-            }
-        }
-
-        if (!submitButton && allButtonsArray.length === 1) {
-            submitButton = allButtonsArray[0];
-            Logger.info(`✅ Método 4: Solo hay 1 botón, asumo que es el submit`);
-        }
-
-        if (!submitButton && allButtonsArray.length > 0) {
-            submitButton = allButtonsArray[allButtonsArray.length - 1];
-            Logger.info(`⚠️ Método 5 (fallback): Usando último botón de la página`);
-        }
+        // Buscar el botón específico del formulario
+        const submitButton = document.querySelector('button[type="submit"][form="datosVehiculoForm"]') ||
+                           document.querySelector('button.btn-primary') ||
+                           Array.from(document.querySelectorAll('button')).find(btn =>
+                               btn.textContent.toLowerCase().includes('guardar')
+                           );
 
         if (submitButton) {
-            const btnText = submitButton.textContent?.trim() || submitButton.value || "(sin texto)";
-            Logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-            Logger.info(`🎯 BOTÓN SELECCIONADO: "${btnText}"`);
-            Logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+            const btnText = submitButton.textContent?.trim() || "(sin texto)";
+            Logger.info(`✅ Botón encontrado: "${btnText}"`);
+            Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
             if (this.currentParkingIsPriority) {
                 Logger.info("🚀 PARQUEO PRIORITARIO → CLIC AUTOMÁTICO");
@@ -535,7 +460,7 @@ class AutoBuyer {
                     Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                     Logger.info("🎉 ¡COMPRA AUTOMÁTICA COMPLETADA!");
                     Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                    Logger.info("👁️  Verifica la siguiente pantalla para confirmar el pago/reserva");
+                    Logger.info("👁️  Verifica la siguiente pantalla para confirmar");
                 } catch (error) {
                     Logger.error(`❌ Error al hacer clic: ${error.message}`);
                 }
@@ -544,12 +469,11 @@ class AutoBuyer {
                 Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
                 Logger.info("📝 ✅ Formulario llenado correctamente");
                 Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                Logger.info("👉 Revisa los datos y haz clic en \"" + btnText + "\" si quieres este parqueo");
-                Logger.info("⚠️  Si NO te interesa, simplemente cierra esta pestaña");
+                Logger.info("👉 Revisa los datos y haz clic en 'Guardar' si te interesa");
             }
         } else {
-            Logger.error("❌❌❌ NO SE PUDO ENCONTRAR NINGÚN BOTÓN SUBMIT ❌❌❌");
-            Logger.error("Esto no debería pasar. Revisa el HTML descargado.");
+            Logger.error("❌ NO SE ENCONTRÓ BOTÓN SUBMIT");
+            Logger.error("Revisa el HTML descargado para verificar el formulario");
         }
     }
 }
