@@ -290,13 +290,58 @@ class AutoBuyer {
             Logger.info("👆 Haciendo clic en botón COMPRAR...");
             buyButton.click();
 
-            setTimeout(() => {
+            // Espera inteligente: detectar cuando el formulario esté listo
+            this._waitForFormToLoad().then(() => {
                 this._fillFormAggressive();
-            }, 2500);
+            });
 
         } catch (error) {
             Logger.error(`Error en compra automática: ${error.message}`);
         }
+    }
+
+    static async _waitForFormToLoad() {
+        Logger.info("⏳ Esperando a que cargue el formulario...");
+        const startTime = Date.now();
+
+        return new Promise((resolve) => {
+            // Timeout de seguridad (5 segundos máximo)
+            const timeout = setTimeout(() => {
+                observer.disconnect();
+                Logger.error("⚠️ Timeout esperando formulario, continuando de todas formas...");
+                resolve();
+            }, 5000);
+
+            // MutationObserver - detecta cambios en el DOM instantáneamente
+            const observer = new MutationObserver(() => {
+                const formLoaded = document.getElementById('marca') ||
+                                 document.getElementById('modelo');
+
+                if (formLoaded) {
+                    observer.disconnect();
+                    clearTimeout(timeout);
+                    const loadTime = Date.now() - startTime;
+                    Logger.info(`✅ Formulario cargado en ${loadTime}ms`);
+                    // Pequeña espera para que Angular termine de renderizar
+                    setTimeout(() => resolve(), 200);
+                }
+            });
+
+            // Iniciar observación de cambios en el DOM
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            // Verificar si ya existe (por si cargó antes de que empezáramos a observar)
+            const formAlreadyLoaded = document.getElementById('marca') || document.getElementById('modelo');
+            if (formAlreadyLoaded) {
+                observer.disconnect();
+                clearTimeout(timeout);
+                Logger.info(`✅ Formulario ya estaba cargado`);
+                setTimeout(() => resolve(), 200);
+            }
+        });
     }
 
     static _findBuyButton(parkingName) {
@@ -372,12 +417,12 @@ class AutoBuyer {
                 Logger.error("❌ No se encontró select de placa letra");
             }
 
-            // 4. Placa Número
+            // 4. Placa Número (todo excepto la primera letra)
             const inputPlacaNumero = document.getElementById('placa_numero');
             if (inputPlacaNumero) {
-                const placa = CONFIG.vehicleData.plate || "000000";
-                const soloNumeros = placa.replace(/[^0-9]/g, '');
-                const placaNumero = soloNumeros.substring(0, 6).padStart(6, '0');
+                const placa = CONFIG.vehicleData.plate || "P000000";
+                // Quitar solo la primera letra, dejar todo lo demás (números Y letras)
+                const placaNumero = placa.substring(1); // Ej: "P674FZV" → "674FZV"
                 inputPlacaNumero.value = placaNumero;
                 Logger.info(`✅ Placa número: ${placaNumero}`);
                 inputPlacaNumero.dispatchEvent(new Event('input', { bubbles: true }));
@@ -414,19 +459,17 @@ class AutoBuyer {
         }
 
         Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        Logger.info("⏳ Esperando 300ms antes de buscar botón submit...");
 
-        setTimeout(() => {
-            this._submitFormAggressive();
-        }, 300);
+        // Sin espera innecesaria - clic inmediato en el botón
+        this._submitFormAggressive();
     }
 
     static async _waitForColorOptions() {
         const maxAttempts = 15; // 1.5 segundos máximo (15 × 100ms)
         let attempts = 0;
 
-        return new Promise((resolve) => {
-            const checkColors = setInterval(() => {
+        return new Promise(async (resolve) => {
+            const checkColors = setInterval(async () => {
                 const selectColor = document.getElementById('color');
                 attempts++;
 
@@ -446,7 +489,21 @@ class AutoBuyer {
                         selectColor.dispatchEvent(new Event('change', { bubbles: true }));
                         selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
                         clearInterval(checkColors);
-                        resolve({ success: true, color: `${colorText} (timeout)` });
+
+                        // Esperar a ver si aparece un campo de texto para "OTRO"
+                        Logger.info("🔍 Buscando campo adicional para 'OTRO COLOR'...");
+                        await new Promise(r => setTimeout(r, 300));
+
+                        const otroColorInput = await AutoBuyer._findOtroColorInput();
+                        if (otroColorInput) {
+                            otroColorInput.value = "Azul";
+                            otroColorInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            otroColorInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            Logger.info(`✅ Campo OTRO llenado con: Azul`);
+                            resolve({ success: true, color: `${colorText} + campo "Azul"` });
+                        } else {
+                            resolve({ success: true, color: `${colorText} (sin campo adicional)` });
+                        }
                     } else {
                         clearInterval(checkColors);
                         resolve({ success: false, error: "No se encontraron opciones de color" });
@@ -456,15 +513,78 @@ class AutoBuyer {
         });
     }
 
+    static async _findOtroColorInput() {
+        // Buscar input de texto NUEVO que haya aparecido (excluir campos conocidos)
+        const maxAttempts = 5; // 500ms máximo
+        let attempts = 0;
+
+        // Campos conocidos del formulario que debemos ignorar
+        const camposConocidos = ['placa_numero', 'modelo', 'marca', 'color', 'placa_letra'];
+
+        return new Promise((resolve) => {
+            const checkInput = setInterval(() => {
+                attempts++;
+
+                // Buscar inputs de texto visibles
+                const inputs = document.querySelectorAll('input[type="text"]');
+                for (const input of inputs) {
+                    const id = input.id || '';
+                    const name = input.name || '';
+                    const lowerName = (id + ' ' + name).toLowerCase();
+
+                    // Excluir campos conocidos del formulario original
+                    if (camposConocidos.some(campo => id === campo || name === campo)) {
+                        continue; // Saltar campos conocidos
+                    }
+
+                    // Si el input está visible y tiene nombre relacionado a "otro" o "color"
+                    if (input.offsetParent !== null &&
+                        (lowerName.includes('otro') || lowerName.includes('color') || lowerName.includes('other'))) {
+                        clearInterval(checkInput);
+                        Logger.info(`✅ Campo OTRO encontrado: ${id || name}`);
+                        resolve(input);
+                        return;
+                    }
+                }
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(checkInput);
+                    Logger.info("⊘ No se encontró campo adicional para OTRO");
+                    resolve(null);
+                }
+            }, 100);
+        });
+    }
+
     static _submitFormAggressive() {
         Logger.info("🔍 BÚSQUEDA DE BOTÓN SUBMIT");
 
-        // Buscar el botón específico del formulario
-        const submitButton = document.querySelector('button[type="submit"][form="datosVehiculoForm"]') ||
-                           document.querySelector('button.btn-primary') ||
-                           Array.from(document.querySelectorAll('button')).find(btn =>
-                               btn.textContent.toLowerCase().includes('guardar')
-                           );
+        // Buscar el botón en orden de especificidad (más específico primero)
+        let submitButton = null;
+
+        // 1. Más específico: por form ID y type
+        submitButton = document.querySelector('button[type="submit"][form="datosVehiculoForm"]');
+        if (submitButton) {
+            Logger.info("✅ Método 1: Botón encontrado por form + type");
+        }
+
+        // 2. Por clase Bootstrap común
+        if (!submitButton) {
+            submitButton = document.querySelector('button.btn-primary');
+            if (submitButton) {
+                Logger.info("✅ Método 2: Botón encontrado por clase btn-primary");
+            }
+        }
+
+        // 3. Por texto "guardar"
+        if (!submitButton) {
+            submitButton = Array.from(document.querySelectorAll('button')).find(btn =>
+                btn.textContent.toLowerCase().includes('guardar')
+            );
+            if (submitButton) {
+                Logger.info("✅ Método 3: Botón encontrado por texto 'guardar'");
+            }
+        }
 
         if (submitButton) {
             const btnText = submitButton.textContent?.trim() || "(sin texto)";
