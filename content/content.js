@@ -337,7 +337,7 @@ class AutoBuyer {
         Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         try {
-            // 1. Radio button tipo de vehículo (seleccionar primero: automóvil)
+            // 1. Radio button tipo de vehículo (automóvil)
             const radioAutomovil = document.getElementById('datosVehiculoForm_automovil');
             if (radioAutomovil) {
                 radioAutomovil.checked = true;
@@ -348,44 +348,19 @@ class AutoBuyer {
                 Logger.error("❌ No se encontró radio button automóvil");
             }
 
-            // 2. Select Marca (primera opción)
+            // 2. Select Marca (dispara carga de colores en background)
             const selectMarca = document.getElementById('marca');
             if (selectMarca && selectMarca.options.length > 0) {
                 selectMarca.selectedIndex = 0;
                 const marcaText = selectMarca.options[0].text.trim();
-                Logger.info(`✅ Marca: ${marcaText}`);
+                Logger.info(`✅ Marca: ${marcaText} (cargando colores...)`);
                 selectMarca.dispatchEvent(new Event('change', { bubbles: true }));
                 selectMarca.dispatchEvent(new Event('blur', { bubbles: true }));
             } else {
                 Logger.error("❌ No se encontró select de marca");
             }
 
-            // Esperar 200ms para que se carguen las opciones de color dinámicamente
-            await new Promise(resolve => setTimeout(resolve, 200));
-
-            // 3. Select Color (primera opción disponible)
-            const selectColor = document.getElementById('color');
-            if (selectColor) {
-                if (selectColor.options.length > 1) {
-                    // Si hay opciones cargadas, seleccionar la primera real (no "Seleccione...")
-                    selectColor.selectedIndex = 1;
-                    const colorText = selectColor.options[1].text.trim();
-                    Logger.info(`✅ Color: ${colorText}`);
-                } else if (selectColor.options.length === 1) {
-                    // Si solo hay 1 opción (probablemente "OTRO COLOR")
-                    selectColor.selectedIndex = 0;
-                    const colorText = selectColor.options[0].text.trim();
-                    Logger.info(`✅ Color: ${colorText}`);
-                } else {
-                    Logger.error("❌ Select de color sin opciones");
-                }
-                selectColor.dispatchEvent(new Event('change', { bubbles: true }));
-                selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
-            } else {
-                Logger.error("❌ No se encontró select de color");
-            }
-
-            // 4. Placa Letra (primera opción: P)
+            // 3. Placa Letra (mientras los colores se cargan)
             const selectPlacaLetra = document.getElementById('placa_letra');
             if (selectPlacaLetra && selectPlacaLetra.options.length > 0) {
                 selectPlacaLetra.selectedIndex = 0;
@@ -397,7 +372,7 @@ class AutoBuyer {
                 Logger.error("❌ No se encontró select de placa letra");
             }
 
-            // 5. Placa Número (extraer números de la placa del config)
+            // 4. Placa Número
             const inputPlacaNumero = document.getElementById('placa_numero');
             if (inputPlacaNumero) {
                 const placa = CONFIG.vehicleData.plate || "000000";
@@ -412,7 +387,7 @@ class AutoBuyer {
                 Logger.error("❌ No se encontró input de placa número");
             }
 
-            // 6. Modelo
+            // 5. Modelo
             const inputModelo = document.getElementById('modelo');
             if (inputModelo) {
                 const modelo = CONFIG.vehicleData.model || "2020";
@@ -425,16 +400,60 @@ class AutoBuyer {
                 Logger.error("❌ No se encontró input de modelo");
             }
 
+            // 6. Select Color (esperar inteligentemente a que se carguen)
+            Logger.info("⏳ Esperando a que se carguen los colores...");
+            const colorResult = await this._waitForColorOptions();
+            if (colorResult.success) {
+                Logger.info(`✅ Color: ${colorResult.color}`);
+            } else {
+                Logger.error(`⚠️ Color: ${colorResult.error}`);
+            }
+
         } catch (error) {
             Logger.error(`❌ Error llenando formulario: ${error.message}`);
         }
 
         Logger.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        Logger.info("⏳ Esperando 500ms antes de buscar botón submit...");
+        Logger.info("⏳ Esperando 300ms antes de buscar botón submit...");
 
         setTimeout(() => {
             this._submitFormAggressive();
-        }, 500);
+        }, 300);
+    }
+
+    static async _waitForColorOptions() {
+        const maxAttempts = 15; // 1.5 segundos máximo (15 × 100ms)
+        let attempts = 0;
+
+        return new Promise((resolve) => {
+            const checkColors = setInterval(() => {
+                const selectColor = document.getElementById('color');
+                attempts++;
+
+                if (selectColor && selectColor.options.length > 1) {
+                    // Colores cargados, seleccionar la primera opción real
+                    selectColor.selectedIndex = 1;
+                    const colorText = selectColor.options[1].text.trim();
+                    selectColor.dispatchEvent(new Event('change', { bubbles: true }));
+                    selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
+                    clearInterval(checkColors);
+                    resolve({ success: true, color: colorText });
+                } else if (attempts >= maxAttempts) {
+                    // Timeout: usar "OTRO COLOR" si está disponible
+                    if (selectColor && selectColor.options.length === 1) {
+                        selectColor.selectedIndex = 0;
+                        const colorText = selectColor.options[0].text.trim();
+                        selectColor.dispatchEvent(new Event('change', { bubbles: true }));
+                        selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
+                        clearInterval(checkColors);
+                        resolve({ success: true, color: `${colorText} (timeout)` });
+                    } else {
+                        clearInterval(checkColors);
+                        resolve({ success: false, error: "No se encontraron opciones de color" });
+                    }
+                }
+            }, 100);
+        });
     }
 
     static _submitFormAggressive() {
