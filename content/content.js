@@ -428,8 +428,7 @@ class AutoBuyer {
                     clearTimeout(timeout);
                     const loadTime = Date.now() - startTime;
                     Logger.info(`✅ Formulario cargado en ${loadTime}ms`);
-                    // Pequeña espera para que Angular termine de renderizar
-                    setTimeout(() => resolve(), 200);
+                    resolve(); // Sin espera - si ya está en el DOM, está listo
                 }
             });
 
@@ -445,7 +444,7 @@ class AutoBuyer {
                 observer.disconnect();
                 clearTimeout(timeout);
                 Logger.info(`✅ Formulario ya estaba cargado`);
-                setTimeout(() => resolve(), 200);
+                resolve(); // Sin espera - si ya está en el DOM, está listo
             }
         });
     }
@@ -571,51 +570,80 @@ class AutoBuyer {
     }
 
     static async _waitForColorOptions() {
-        const maxAttempts = 15; // 1.5 segundos máximo (15 × 100ms)
-        let attempts = 0;
+        const startTime = Date.now();
 
         return new Promise(async (resolve) => {
-            const checkColors = setInterval(async () => {
-                const selectColor = document.getElementById('color');
-                attempts++;
+            const selectColor = document.getElementById('color');
+            if (!selectColor) {
+                resolve({ success: false, error: "No se encontró select de color" });
+                return;
+            }
 
-                if (selectColor && selectColor.options.length > 1) {
-                    // Colores cargados, seleccionar la primera opción real
+            // Timeout de seguridad (1.5 segundos máximo)
+            const timeout = setTimeout(async () => {
+                observer.disconnect();
+                Logger.info("⚠️ Timeout esperando colores, usando OTRO COLOR");
+
+                // Usar "OTRO COLOR" si está disponible
+                if (selectColor.options.length >= 1) {
+                    selectColor.selectedIndex = 0;
+                    const colorText = selectColor.options[0].text.trim();
+                    selectColor.dispatchEvent(new Event('change', { bubbles: true }));
+                    selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
+
+                    // Esperar a ver si aparece un campo de texto para "OTRO"
+                    Logger.info("🔍 Buscando campo adicional para 'OTRO COLOR'...");
+                    await new Promise(r => setTimeout(r, 100));
+
+                    const otroColorInput = await AutoBuyer._findOtroColorInput();
+                    if (otroColorInput) {
+                        otroColorInput.value = "Azul";
+                        otroColorInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        otroColorInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        Logger.info(`✅ Campo OTRO llenado con: Azul`);
+                        resolve({ success: true, color: `${colorText} + campo "Azul"` });
+                    } else {
+                        resolve({ success: true, color: `${colorText} (sin campo adicional)` });
+                    }
+                } else {
+                    resolve({ success: false, error: "No se encontraron opciones de color" });
+                }
+            }, 1500);
+
+            // MutationObserver para detectar cuando se agregan opciones al select
+            const observer = new MutationObserver(() => {
+                if (selectColor.options.length > 1) {
+                    observer.disconnect();
+                    clearTimeout(timeout);
+                    const loadTime = Date.now() - startTime;
+                    Logger.info(`✅ Colores cargados en ${loadTime}ms`);
+
+                    // Seleccionar la primera opción real
                     selectColor.selectedIndex = 1;
                     const colorText = selectColor.options[1].text.trim();
                     selectColor.dispatchEvent(new Event('change', { bubbles: true }));
                     selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
-                    clearInterval(checkColors);
                     resolve({ success: true, color: colorText });
-                } else if (attempts >= maxAttempts) {
-                    // Timeout: usar "OTRO COLOR" si está disponible
-                    if (selectColor && selectColor.options.length === 1) {
-                        selectColor.selectedIndex = 0;
-                        const colorText = selectColor.options[0].text.trim();
-                        selectColor.dispatchEvent(new Event('change', { bubbles: true }));
-                        selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
-                        clearInterval(checkColors);
-
-                        // Esperar a ver si aparece un campo de texto para "OTRO"
-                        Logger.info("🔍 Buscando campo adicional para 'OTRO COLOR'...");
-                        await new Promise(r => setTimeout(r, 300));
-
-                        const otroColorInput = await AutoBuyer._findOtroColorInput();
-                        if (otroColorInput) {
-                            otroColorInput.value = "Azul";
-                            otroColorInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            otroColorInput.dispatchEvent(new Event('change', { bubbles: true }));
-                            Logger.info(`✅ Campo OTRO llenado con: Azul`);
-                            resolve({ success: true, color: `${colorText} + campo "Azul"` });
-                        } else {
-                            resolve({ success: true, color: `${colorText} (sin campo adicional)` });
-                        }
-                    } else {
-                        clearInterval(checkColors);
-                        resolve({ success: false, error: "No se encontraron opciones de color" });
-                    }
                 }
-            }, 100);
+            });
+
+            observer.observe(selectColor, {
+                childList: true, // Detecta cuando se agregan/eliminan <option>
+                subtree: false
+            });
+
+            // Verificar si ya están cargados
+            if (selectColor.options.length > 1) {
+                observer.disconnect();
+                clearTimeout(timeout);
+                Logger.info(`✅ Colores ya estaban cargados`);
+
+                selectColor.selectedIndex = 1;
+                const colorText = selectColor.options[1].text.trim();
+                selectColor.dispatchEvent(new Event('change', { bubbles: true }));
+                selectColor.dispatchEvent(new Event('blur', { bubbles: true }));
+                resolve({ success: true, color: colorText });
+            }
         });
     }
 
